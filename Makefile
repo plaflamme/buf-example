@@ -65,12 +65,24 @@ endif
 	@mkdir -p $(dir $(BUF))
 	@touch $(BUF)
 
+CHECK_LINT := $(CACHE_VERSIONS)/protoc-gen-buf-check-lint/$(BUF_VERSION)
+$(CHECK_LINT):
+	@rm -f $(CACHE_BIN)/protoc-gen-buf-check-lint
+	@mkdir -p $(CACHE_BIN)
+	curl -sSL \
+		"https://github.com/bufbuild/buf/releases/download/v$(BUF_VERSION)/protoc-gen-buf-check-lint-$(UNAME_OS)-$(UNAME_ARCH)" \
+		-o "$(CACHE_BIN)/protoc-gen-buf-check-lint"
+	chmod +x "$(CACHE_BIN)/protoc-gen-buf-check-lint"
+	@rm -rf $(dir $(CHECK_LINT))
+	@mkdir -p $(dir $(CHECK_LINT))
+	@touch $(CHECK_LINT)
+
 .DEFAULT_GOAL := local
 
 # deps allows us to install deps without running any checks.
 
 .PHONY: deps
-deps: $(BUF)
+deps: $(BUF) $(CHECK_LINT)
 
 # local is what we run when testing locally.
 # This does breaking change detection against our local git repository.
@@ -96,6 +108,11 @@ https: $(BUF)
 ssh: $(BUF)
 	buf check lint
 	buf check breaking --against-input "$(SSH_GIT)#branch=master"
+
+# NOTE: this assumes protoc is on the $PATH
+.PHONY: protoc
+protoc: $(CHECK_LINT)
+	protoc -Iproto --buf-check-lint_out=target --buf-check-lint_opt='{"input_config":"buf.yaml"}' proto/bufbuild/example/asset/v1/asset.proto
 
 # clean deletes any files not checked in and the cache for all platforms.
 
